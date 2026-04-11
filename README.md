@@ -17,10 +17,11 @@ This tool will extract all playlists from the rekordbox database, then interact 
 Get your Plex token and server url. You can get the Plex token from localstorage when connecting to your server through the browser.
 
 ```
-virtualenv venv
-pip install -r requirements.txt
-python app.py <server url> <token>
+uv sync
+uv run app.py
 ```
+
+To run properly, you must add a `.env` file with `X_PLEX_TOKEN` and `PLEX_SERVER_URL`
 
 Example: `python app.py 'http://localhost:32400' '123456abcdefg'`
 

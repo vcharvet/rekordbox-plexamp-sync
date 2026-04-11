@@ -1,9 +1,16 @@
 import ctypes
 import json
-import sys
-from typing import Any, TypedDict, Union, List
+import os
+from typing import Any, List, TypedDict, Union
 
+from dotenv import load_dotenv
 from plexapi.server import PlexServer
+
+load_dotenv()
+
+
+X_PLEX_TOKEN = os.environ["X_PLEX_TOKEN"]
+SERVER_BASEURL = os.environ["PLEXAPI_AUTH_SERVER_BASEURL"]
 
 
 class DjMdContent(TypedDict):
@@ -113,13 +120,13 @@ class PlaylistObj(TypedDict):
 
 
 def get_playlists() -> List[PlaylistObj]:
-    library = ctypes.cdll.LoadLibrary('./library.so')
+    library = ctypes.cdll.LoadLibrary("./library.so")
     getPlaylists = library.getPlaylists
     getPlaylists.restype = ctypes.c_void_p
 
     playlists = getPlaylists()
     playlists_bytes = ctypes.string_at(playlists)
-    playlists_str = playlists_bytes.decode('utf-8')
+    playlists_str = playlists_bytes.decode("utf-8")
     playlists_parsed = json.loads(playlists_str)
 
     return playlists_parsed
@@ -127,34 +134,28 @@ def get_playlists() -> List[PlaylistObj]:
 
 pl = get_playlists()
 
-if len(sys.argv) <= 2:
-    print('Please provide a valid URL and token')
-    print('Usage: python3 app.py <server url> <token>')
-    sys.exit(0)
+print(f"Trying url {SERVER_BASEURL} with token {X_PLEX_TOKEN}")
 
-token = sys.argv[2]
-server_url = sys.argv[1]
-
-plex = PlexServer(server_url, token)
+plex = PlexServer(SERVER_BASEURL, X_PLEX_TOKEN)
 
 for p in pl:
-    playlist_title = p['dj_md_playlist']['name']
+    playlist_title = p["dj_md_playlist"]["name"]
 
-    print('syncing', playlist_title)
+    print("syncing", playlist_title)
 
     tracks = []
-    if 'dj_md_contents' not in p or len(p['dj_md_contents']) == 0:
-        print('no tracks in playlist', playlist_title)
+    if "dj_md_contents" not in p or len(p["dj_md_contents"]) == 0:
+        print("no tracks in playlist", playlist_title)
         continue
 
-    for content in p['dj_md_contents']:
-        file_path = content['folder_path']
-        file_name = content['file_name_l']
-        title = content['title']
+    for content in p["dj_md_contents"]:
+        file_path = content["folder_path"]
+        file_name = content["file_name_l"]
+        title = content["title"]
 
         # search for track, by filename and then by title
-        found_file = plex.library.search(file=file_name, libtype='track')
-        found_name = plex.library.search(title=title, libtype='track')
+        found_file = plex.library.search(file=file_name, libtype="track")
+        found_name = plex.library.search(title=title, libtype="track")
         if len(found_file) > 0:
             track = found_file[0]
             tracks += [track]
@@ -166,8 +167,11 @@ for p in pl:
             continue
 
         print("track not found", title, file_path)
+        with open("log.txt", "a") as log_file:
+            log_file.write(f"{title} {file_path}\n")
 
-    combined_title = "{}".format(p['combined_name'])
+
+    combined_title = "{}".format(p["combined_name"])
     existing_playlists = plex.playlists(title=combined_title)
 
     if len(existing_playlists) > 0:
@@ -178,9 +182,8 @@ for p in pl:
                 pass
 
         existing_playlists[0].addItems(tracks)
-        print('updated playlist %s' % combined_title)
+        print("updated playlist %s" % combined_title)
         continue
 
     pl = plex.createPlaylist(title=combined_title, items=tracks)
-    print('created playlist %s' % combined_title)
-
+    print("created playlist %s" % combined_title)
