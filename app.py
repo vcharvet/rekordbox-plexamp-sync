@@ -167,7 +167,7 @@ for p in pl:
             continue
 
         print("track not found", title, file_path)
-        with open("log.txt", "a") as log_file:
+        with open("log.txt", "w") as log_file:
             log_file.write(f"{title} {file_path}\n")
 
 
@@ -185,5 +185,8 @@ for p in pl:
         print("updated playlist %s" % combined_title)
         continue
 
-    pl = plex.createPlaylist(title=combined_title, items=tracks)
-    print("created playlist %s" % combined_title)
+    try:
+        pl = plex.createPlaylist(title=combined_title, items=tracks)
+        print("created playlist %s" % combined_title)
+    except Exception as e:
+        print("error creating playlist", e)
