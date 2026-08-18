@@ -33,6 +33,7 @@ class DjMdContent(TypedDict):
     release_year: Union[int, None]
     remixer_id: Union[str, None]
     label_id: Union[str, None]
+    label_name: Union[str, None]
     org_artist_id: Union[str, None]
     key_id: Union[str, None]
     stock_date: Union[str, None]
@@ -132,61 +133,116 @@ def get_playlists() -> List[PlaylistObj]:
     return playlists_parsed
 
 
-pl = get_playlists()
+def sync_playlists():
+    pl = get_playlists()
 
-print(f"Trying url {SERVER_BASEURL} with token {X_PLEX_TOKEN}")
+    print(f"Trying url {SERVER_BASEURL} with token {X_PLEX_TOKEN}")
 
-plex = PlexServer(SERVER_BASEURL, X_PLEX_TOKEN)
+    plex = PlexServer(SERVER_BASEURL, X_PLEX_TOKEN)
 
-for p in pl:
-    playlist_title = p["dj_md_playlist"]["name"]
+    for p in pl:
+        playlist_title = p["dj_md_playlist"]["name"]
 
-    print("syncing", playlist_title)
+        print("syncing", playlist_title)
 
-    tracks = []
-    if "dj_md_contents" not in p or len(p["dj_md_contents"]) == 0:
-        print("no tracks in playlist", playlist_title)
-        continue
-
-    for content in p["dj_md_contents"]:
-        file_path = content["folder_path"]
-        file_name = content["file_name_l"]
-        title = content["title"]
-
-        # search for track, by filename and then by title
-        found_file = plex.library.search(file=file_name, libtype="track")
-        found_name = plex.library.search(title=title, libtype="track")
-        if len(found_file) > 0:
-            track = found_file[0]
-            tracks += [track]
+        tracks = []
+        if "dj_md_contents" not in p or len(p["dj_md_contents"]) == 0:
+            print("no tracks in playlist", playlist_title)
             continue
 
-        if len(found_name) > 0:
-            track = found_name[0]
-            tracks += [track]
+        for content in p["dj_md_contents"]:
+            file_path = content["folder_path"]
+            file_name = content["file_name_l"]
+            title = content["title"]
+
+            # search for track, by filename and then by title
+            found_file = plex.library.search(file=file_name, libtype="track")
+            found_name = plex.library.search(title=title, libtype="track")
+            if len(found_file) > 0:
+                track = found_file[0]
+                tracks += [track]
+                continue
+
+            if len(found_name) > 0:
+                track = found_name[0]
+                tracks += [track]
+                continue
+
+            print("track not found", title, file_path)
+            with open("log.txt", "w") as log_file:
+                log_file.write(f"{title} {file_path}\n")
+
+        combined_title = "{}".format(p["combined_name"])
+        existing_playlists = plex.playlists(title=combined_title)
+
+        if len(existing_playlists) > 0:
+            for track in existing_playlists[0].items():
+                try:
+                    existing_playlists[0].removeItems([track])
+                except Exception as _:
+                    pass
+
+            existing_playlists[0].addItems(tracks)
+            print("updated playlist %s" % combined_title)
             continue
 
-        print("track not found", title, file_path)
-        with open("log.txt", "w") as log_file:
-            log_file.write(f"{title} {file_path}\n")
+        try:
+            pl = plex.createPlaylist(title=combined_title, items=tracks)
+            print("created playlist %s" % combined_title)
+        except Exception as e:
+            print("error creating playlist", e)
 
 
-    combined_title = "{}".format(p["combined_name"])
-    existing_playlists = plex.playlists(title=combined_title)
+def sync_record_labels():
+    pl = get_playlists()
 
-    if len(existing_playlists) > 0:
-        for track in existing_playlists[0].items():
+    print("Syncing record labels to Plex")
+
+    plex = PlexServer(SERVER_BASEURL, X_PLEX_TOKEN)
+    for p in pl:
+        if "dj_md_contents" not in p or len(p["dj_md_contents"]) == 0:
+            continue
+        print(f"Syncing {p.get("combined_name")}")
+
+        for content in p["dj_md_contents"]:
+            label = content.get("label_name")
+            if not label:
+                continue
+
+            file_name = content["file_name_l"]
+            title = content["title"]
+
+            # search for track, by filename and then by title
+            found_file = plex.library.search(file=file_name, libtype="track")
+            found_name = plex.library.search(title=title, libtype="track")
+
+            if len(found_file) > 0:
+                track = found_file[0]
+            elif len(found_name) > 0:
+                track = found_name[0]
+            else:
+                continue
+
+            # get the album from the track
             try:
-                existing_playlists[0].removeItems([track])
-            except:
-                pass
+                album = track.album()
+            except Exception:
+                continue
 
-        existing_playlists[0].addItems(tracks)
-        print("updated playlist %s" % combined_title)
-        continue
+            if not album:
+                continue
 
-    try:
-        pl = plex.createPlaylist(title=combined_title, items=tracks)
-        print("created playlist %s" % combined_title)
-    except Exception as e:
-        print("error creating playlist", e)
+            if album.studio != "":
+                continue
+
+            # update the studio (record label) field
+            try:
+                album.editStudio(label)
+                print(f"Set studio '{label}' for album '{album.title}'")
+            except Exception as e:
+                print(f"Error setting studio '{label}' for album '{album.title}': {e}")
+
+
+if __name__ == "__main__":
+    sync_playlists()
+    sync_record_labels()

@@ -6,6 +6,8 @@ __pycache__/
 # C extensions
 *.so
 
+*.h
+
 # Distribution / packaging
 .Python
 build/
@@ -130,3 +132,10 @@ dmypy.json
 
 
 .DS_Store
+
+# zed settings
+.zed
+
+# other
+log.txt
+main.py  # test module

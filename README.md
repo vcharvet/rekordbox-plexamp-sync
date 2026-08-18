@@ -51,6 +51,22 @@ library = ctypes.cdll.LoadLibrary('./library.dll')
 
 Then, follow steps from "Usage (mac)"
 
+## Rebuilding the Go module
+
+If you modify `main.go` (e.g., to add new fields like label names), you need to rebuild `library.so`:
+
+```bash
+# Install Go (if not already installed)
+brew install go
+
+# Install OpenSSL headers (required for go-sqlcipher)
+brew install openssl
+
+# Rebuild the shared library
+CGO_CFLAGS="-I/opt/homebrew/include" CGO_LDFLAGS="-L/opt/homebrew/lib" \
+  go build -buildmode=c-shared -o library.so main.go
+```
+
 ## Limitations and todos
 - Intelligent Playlists aren't supported yet, this needs some extra work
 - Matching happens against filename and then title as backup, this can still be improved

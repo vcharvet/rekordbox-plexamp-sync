@@ -12,10 +12,16 @@ import (
 )
 import "encoding/json"
 
+// ExtendedContent adds label name to the rekordbox content
+type ExtendedContent struct {
+	*rekordbox.DjmdContent
+	LabelName string `json:"label_name,omitempty"`
+}
+
 type Playlist struct {
-	CombinedName string                   `json:"combined_name"`
-	DJMdPlaylist *rekordbox.DjmdPlaylist  `json:"dj_md_playlist,omitempty"`
-	DJMdContents []*rekordbox.DjmdContent `json:"dj_md_contents,omitempty"`
+	CombinedName string                  `json:"combined_name"`
+	DJMdPlaylist *rekordbox.DjmdPlaylist `json:"dj_md_playlist,omitempty"`
+	DJMdContents []*ExtendedContent      `json:"dj_md_contents,omitempty"`
 }
 
 func getRecursivePlaylistName(ctx context.Context, client *rekordbox.Client, playlist *rekordbox.DjmdPlaylist, nameSoFar string) string {
@@ -80,7 +86,22 @@ func getPlaylists() *C.char {
 				panic(err)
 			}
 
-			pl.DJMdContents = append(pl.DJMdContents, content)
+			// Fetch label name if LabelID exists
+			labelName := ""
+			if content.LabelID.Valid() {
+				label, err := client.DjmdLabelByID(ctx, content.LabelID)
+				if err == nil && label != nil && label.Name.Valid() {
+					labelName = label.Name.String()
+				}
+			}
+
+			// Create extended content with label name
+			extended := &ExtendedContent{
+				DjmdContent: content,
+				LabelName:   labelName,
+			}
+
+			pl.DJMdContents = append(pl.DJMdContents, extended)
 		}
 
 		parsedPlaylists = append(parsedPlaylists, pl)
