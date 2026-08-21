@@ -169,7 +169,7 @@ def sync_playlists():
                 continue
 
             print("track not found", title, file_path)
-            with open("log.txt", "w") as log_file:
+            with open("log.txt", "a") as log_file:
                 log_file.write(f"{title} {file_path}\n")
 
         combined_title = "{}".format(p["combined_name"])

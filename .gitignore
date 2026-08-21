@@ -138,4 +138,6 @@ dmypy.json
 
 # other
 log.txt
-main.py  # test module
+
+# test module
+main.py
